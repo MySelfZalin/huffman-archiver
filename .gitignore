@@ -9,3 +9,7 @@ env.bak/
 venv.bak/
 .ruff_cache/
 .vscode
+input.bin
+input.txt
+output.bin
+output.txt
