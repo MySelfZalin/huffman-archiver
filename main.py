@@ -21,7 +21,7 @@ class TreeNode:
 
 
 
-def read_data(input_file: str) -> Counter:
+def read_data_for_freq(input_file: str) -> Counter:
     freq = Counter()
     with open(input_file, "rb") as f:
         while chunk := f.read(262144): # 256 KiB
@@ -36,24 +36,6 @@ def make_internal(left: TreeNode, right: TreeNode) -> TreeNode:
     return TreeNode(val=None, count=left.count + right.count, left=left, right=right)
 
 
-def _levelOrderTraversal(root: TreeNode) -> list:
-    if not root:
-        return []
-
-    res = []
-    queue = deque()
-    queue.append(root)
-    
-    while queue:
-        node = queue.popleft()
-        
-        if node:
-            res.append(node.val)
-            queue.append(node.left)
-            queue.append(node.right)
-        else:
-            res.append(None)
-    return res
     
     
 def build_tree(heap: list[TreeNode]) -> TreeNode:
@@ -69,7 +51,44 @@ def build_tree(heap: list[TreeNode]) -> TreeNode:
 def generate_codes(root: TreeNode) -> dict[int, str]:
     if not root.left and not root.right:
         return {root.val: "0"}
-    ... # todo
+    
+    codes = {}
+    
+    def _traverse(node, curr_code): # todo переписать на итеративный подход
+        if not node.left and not node.right:
+            codes[node.val] = curr_code
+            return
+
+        _traverse(node.left, curr_code + "0")
+        _traverse(node.right, curr_code + "1")
+
+    
+    
+    _traverse(root, "")
+    return codes
+
+
+def file_to_bits(input_file: str, codes: dict) -> str:
+    with open(input_file, "rb") as f:
+        res = []
+        while chunk := f.read(262144): # 256 KiB
+            for b in chunk:
+                res.append(codes[b])
+        return "".join(res)
+    
+def padding_bits(bits: str) -> tuple[str, int]:
+    remain = len(bits) % 8
+    
+    if remain == 0:
+        return bits, 0
+
+    padding = 8 - remain
+    
+    return bits + "0" * padding, padding
+    
+
+def bits_to_bytes(bits: str) -> bytes:
+    return bytes(int(bits[i:i+8], 2) for i in range(0, len(bits), 8))
 
 
 def compress(input_file: str, output_file: str) -> bool:  # TODO: цель записать результат компресинга в output_file
@@ -78,7 +97,7 @@ def compress(input_file: str, output_file: str) -> bool:  # TODO: цель за�
         return True
     
     heap = []
-    freq = read_data(input_file)
+    freq = read_data_for_freq(input_file)
         
     for raw_bytes, count in freq.items():
         heapq.heappush(heap, make_leaf(raw_bytes, count))
@@ -87,10 +106,16 @@ def compress(input_file: str, output_file: str) -> bool:  # TODO: цель за�
    
     codes = generate_codes(root)
     
-    print(_levelOrderTraversal(root)) #для визуализации
+    raw_bits, pad = padding_bits(file_to_bits(input_file, codes))
+    compressed_data = bits_to_bytes(raw_bits)
     
-    #вызываем запись
+    meta = {"pad": pad, "freq": freq}
+    meta_bytes = (json.dumps(meta) + "\n").encode("utf8")    
     
+    with open(output_file, "wb") as f:
+        f.write(meta_bytes)
+        f.write(compressed_data)
+
     return True
 
 
